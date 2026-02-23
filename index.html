@@ -106,6 +106,16 @@
             padding: 5px;
             border: 1px solid #ccc;
             border-radius: 5px;
+            width: 520px;
+            max-width: 90vw;
+        }
+
+        #searchMode {
+            margin-left: 8px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
         }
 
         #logTable_paginate {
@@ -181,6 +191,23 @@
             return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
 
+        function buildSearchRegex(raw, mode) {
+            const terms = raw
+                .split(/\s+/)
+                .filter(Boolean)
+                .map(escapeRegex);
+
+            if (!terms.length) {
+                return '';
+            }
+
+            if (mode === 'all') {
+                return terms.map(term => `(?=.*${term})`).join('');
+            }
+
+            return terms.join('|');
+        }
+
         document.getElementById('fileInput').addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -234,22 +261,31 @@
                 });
 
                 const searchInput = $('#logTable_filter input');
-                searchInput.off('.DT');
-                searchInput.on('input', function () {
-                    const raw = this.value.trim();
+                const filterLabel = $('#logTable_filter label');
+
+                $('#searchMode').remove();
+                filterLabel.append(`
+                    <select id="searchMode" title="Modo da busca">
+                        <option value="any" selected>Qualquer termo (OU)</option>
+                        <option value="all">Todos os termos (E)</option>
+                    </select>
+                `);
+
+                function applyHybridSearch() {
+                    const raw = searchInput.val().trim();
+                    const mode = $('#searchMode').val();
+
                     if (!raw) {
                         table.search('').draw();
                         return;
                     }
 
-                    const terms = raw
-                        .split(/\s+/)
-                        .filter(Boolean)
-                        .map(escapeRegex);
-
-                    const regex = terms.join('|');
+                    const regex = buildSearchRegex(raw, mode);
                     table.search(regex, true, false).draw();
-                });
+                }
+
+                searchInput.off('.DT').on('input', applyHybridSearch);
+                $('#searchMode').off('change').on('change', applyHybridSearch);
 
                 $('#logTable tbody').off('dblclick').on('dblclick', 'td', function () {
                     const cellIndex = table.cell(this).index().column;

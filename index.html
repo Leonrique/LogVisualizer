@@ -177,6 +177,10 @@
     <script>
         let table;
 
+        function escapeRegex(value) {
+            return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
         document.getElementById('fileInput').addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -227,6 +231,24 @@
                     columnDefs: [
                         { targets: 0, searchable: false }
                     ]
+                });
+
+                const searchInput = $('#logTable_filter input');
+                searchInput.off('.DT');
+                searchInput.on('input', function () {
+                    const raw = this.value.trim();
+                    if (!raw) {
+                        table.search('').draw();
+                        return;
+                    }
+
+                    const terms = raw
+                        .split(/\s+/)
+                        .filter(Boolean)
+                        .map(escapeRegex);
+
+                    const regex = terms.join('|');
+                    table.search(regex, true, false).draw();
                 });
 
                 $('#logTable tbody').off('dblclick').on('dblclick', 'td', function () {

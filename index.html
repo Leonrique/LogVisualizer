@@ -186,26 +186,46 @@
     <script src="https://cdn.datatables.net/colreorder/1.6.2/js/dataTables.colReorder.min.js"></script>
     <script>
         let table;
+        let customSearchRegistered = false;
+        const customSearchState = {
+            terms: [],
+            mode: 'any'
+        };
 
-        function escapeRegex(value) {
-            return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        function tokenizeSearch(raw) {
+            return raw
+                .toLowerCase()
+                .split(/\s+/)
+                .filter(Boolean);
         }
 
-        function buildSearchRegex(raw, mode) {
-            const terms = raw
-                .split(/\s+/)
-                .filter(Boolean)
-                .map(escapeRegex);
-
+        function rowMatchesTerms(rowText, terms, mode) {
             if (!terms.length) {
-                return '';
+                return true;
             }
 
             if (mode === 'all') {
-                return terms.map(term => `(?=.*${term})`).join('');
+                return terms.every(term => rowText.includes(term));
             }
 
-            return terms.join('|');
+            return terms.some(term => rowText.includes(term));
+        }
+
+        function registerCustomSearch() {
+            if (customSearchRegistered) {
+                return;
+            }
+
+            $.fn.dataTable.ext.search.push(function (settings, data) {
+                if (!settings.nTable || settings.nTable.id !== 'logTable') {
+                    return true;
+                }
+
+                const rowText = data.join(' ').toLowerCase();
+                return rowMatchesTerms(rowText, customSearchState.terms, customSearchState.mode);
+            });
+
+            customSearchRegistered = true;
         }
 
         document.getElementById('fileInput').addEventListener('change', function (e) {
@@ -260,6 +280,8 @@
                     ]
                 });
 
+                registerCustomSearch();
+
                 const searchInput = $('#logTable_filter input');
                 const filterLabel = $('#logTable_filter label');
 
@@ -273,15 +295,9 @@
 
                 function applyHybridSearch() {
                     const raw = searchInput.val().trim();
-                    const mode = $('#searchMode').val();
-
-                    if (!raw) {
-                        table.search('').draw();
-                        return;
-                    }
-
-                    const regex = buildSearchRegex(raw, mode);
-                    table.search(regex, true, false).draw();
+                    customSearchState.mode = $('#searchMode').val();
+                    customSearchState.terms = tokenizeSearch(raw);
+                    table.search('').draw();
                 }
 
                 searchInput.off('.DT').on('input', applyHybridSearch);
